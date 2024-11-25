@@ -83,15 +83,15 @@ public class NFCWriter: NSObject, ObservableObject, NFCNDEFReaderSessionDelegate
         
         let tag = tags.first!
         session.connect(to: tag, completionHandler: { (error: Error?) in
-            if nil != error {
-                session.alertMessage = "Unable to connect to tag."
+            if let error = error {
+                session.alertMessage = "Unable to connect to tag: \(error.localizedDescription)"
                 session.invalidate()
                 return
             }
             
             tag.queryNDEFStatus(completionHandler: { (ndefStatus: NFCNDEFStatus, capacity: Int, error: Error?) in
                 guard error == nil else {
-                    session.alertMessage = "Unable to query the status of tag."
+                    session.alertMessage = "Unable to query the status of tag: \(error!.localizedDescription)"
                     session.invalidate()
                     return
                 }
@@ -104,28 +104,10 @@ public class NFCWriter: NSObject, ObservableObject, NFCNDEFReaderSessionDelegate
                     session.alertMessage = "Read only tag detected."
                     session.invalidate()
                 case .readWrite:
-                    let payload: NFCNDEFPayload?
-                    if self.type == "T" {
-                        payload = NFCNDEFPayload.init(
-                            format: .nfcWellKnown,
-                            type: Data("\(self.type)".utf8),
-                            identifier: Data(),
-                            payload: Data("\(self.msg)".utf8)
-                        )
-                    } else {
-                        payload = NFCNDEFPayload.wellKnownTypeURIPayload(string: "\(self.msg)")
-                    }
-                    let message = NFCNDEFMessage(records: [payload].compactMap({ $0 }))
-                    tag.writeNDEF(message, completionHandler: { (error: Error?) in
-                        if nil != error {
-                            session.alertMessage = "Write to tag fail: \(error!)"
-                        } else {
-                            session.alertMessage = self.endAlert != "" ? self.endAlert : "Write \(self.msg) to tag successful."
-                        }
-                        session.invalidate()
-                    })
+                    let data: [Any] = [123, "Hello", 45.67] // Example data
+                    writeData(to: tag, data: data, session: session)
                 @unknown default:
-                    session.alertMessage = "Unknown tag status."
+                    session.alertMessage = "Unknown NDEF status."
                     session.invalidate()
                 }
             })
@@ -139,4 +121,59 @@ public class NFCWriter: NSObject, ObservableObject, NFCNDEFReaderSessionDelegate
         print("Session did invalidate with error: \(error)")
         self.session = nil
     }
+}
+
+func createPayload(from data: [Any]) -> [NFCNDEFPayload] {
+    var payloads: [NFCNDEFPayload] = []
+    
+    for item in data {
+        let payload: NFCNDEFPayload?
+        
+        switch item {
+        case let intValue as Int:
+            payload = NFCNDEFPayload(
+                format: .nfcWellKnown,
+                type: Data("I".utf8),
+                identifier: Data(),
+                payload: Data("\(intValue)".utf8)
+            )
+        case let stringValue as String:
+            payload = NFCNDEFPayload(
+                format: .nfcWellKnown,
+                type: Data("S".utf8),
+                identifier: Data(),
+                payload: Data(stringValue.utf8)
+            )
+        case let floatValue as Float:
+            payload = NFCNDEFPayload(
+                format: .nfcWellKnown,
+                type: Data("F".utf8),
+                identifier: Data(),
+                payload: Data("\(floatValue)".utf8)
+            )
+        default:
+            continue
+        }
+        
+        if let payload = payload {
+            payloads.append(payload)
+        }
+    }
+    
+    return payloads
+}
+
+func writeData(to tag: NFCNDEFTag, data: [Any], session: NFCNDEFReaderSession) {
+    let payloads = createPayload(from: data)
+    
+    let message = NFCNDEFMessage(records: payloads)
+    
+    tag.writeNDEF(message, completionHandler: { (error: Error?) in
+        if let error = error {
+            session.alertMessage = "Write NDEF message failed: \(error.localizedDescription)"
+        } else {
+            session.alertMessage = "Write NDEF message successful."
+        }
+        session.invalidate()
+    })
 }

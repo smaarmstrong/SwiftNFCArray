@@ -7,21 +7,21 @@
 import PackageDescription
 
 let package = Package(
-    name: "SwiftNFC",
+    name: "SwiftNFCArray",
     defaultLocalization: "en",
     platforms: [
         .iOS(.v15)
     ],
     products: [
         .library(
-            name: "SwiftNFC",
-            targets: ["SwiftNFC"]),
+            name: "SwiftNFCArray",
+            targets: ["SwiftNFCArray"]),
     ],
     dependencies: [
     ],
     targets: [
         .target(
-            name: "SwiftNFC",
+            name: "SwiftNFCArray",
             dependencies: [])
     ]
 )
